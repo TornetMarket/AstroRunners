@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Astro Runners</title>
+  <!-- Set the site icon using astro.png -->
+  <link rel="icon" type="image/png" href="astro.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Global Styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; font-family: Arial, sans-serif; background: #000; color: #fff; overflow: hidden; }
+    
+    /* Responsive adjustments for mobile */
+    @media only screen and (max-width: 600px) {
+      #loading-screen { font-size: 2em; }
+      #menu-screen h1 { font-size: 3em; }
+      .menu-button { width: 150px; padding: 10px; font-size: 1em; }
+      #ui { font-size: 1em; }
+    }
+    
+    /* Loading Screen */
+    #loading-screen {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3em;
+      opacity: 0;
+      animation: fadeIn 2s forwards;
+      z-index: 10;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+    
+    /* Menu Screen */
+    #menu-screen {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9;
+    }
+    /* Display astro.png in the menu (60x60) above the title */
+    #menu-screen img {
+      width: 420px;
+      height: 380px;
+      margin-bottom: 20px;
+    }
+    #menu-screen h1 { font-size: 4em; margin-bottom: 40px; }
+    .menu-button {
+      width: 200px;
+      padding: 15px;
+      margin: 10px;
+      font-size: 1.2em;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      background: #333;
+      color: #fff;
+      transition: background 0.3s;
+    }
+    .menu-button:hover { background: #555; }
+    
+    /* Shop Modal */
+    #shop-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 11;
+    }
+    .modal-content {
+      background: #222;
+      padding: 20px;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 400px;
+    }
+    .modal-content h2 { margin-bottom: 15px; }
+    .close-button {
+      float: right;
+      font-size: 1.5em;
+      cursor: pointer;
+      color: #fff;
+    }
+    .shop-item {
+      margin: 10px 0;
+      padding: 10px;
+      background: #333;
+      border-radius: 5px;
+    }
+    .shop-item button {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border: none;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .shop-item button:hover { background: #666; }
+    /* Display player's money in the shop modal */
+    #shop-money { margin-bottom: 15px; font-size: 1.1em; }
+    
+    /* Game Canvas and UI */
+    #gameCanvas {
+      display: none;
+      background: #000;
+      position: absolute;
+      top: 0; left: 0;
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: calc(100% - 20px);
+      z-index: 5;
+      pointer-events: none;
+      font-size: 1.2em;
+      display: none;
+    }
+    #ui span {
+      margin: 0 10px;
+    }
+    /* The Shoot button is shown only for mobile users (via JS) */
+    #shoot-button {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      font-size: 1em;
+      background: #333;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+      z-index: 6;
+    }
+    /* Mobile Nuke Button (shown only on mobile if user has a nuke) */
+    #nuke-button-mobile {
+      position: absolute;
+      bottom: 20px;
+      left: calc(50% + 100px);
+      padding: 12px 24px;
+      font-size: 1em;
+      background: #900;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+      z-index: 6;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Audio Elements -->
+  <!-- Background Soundtrack -->
+  <audio id="game-audio" src="dubstep.mp3" loop preload="auto"></audio>
+  <!-- Preload the shoot sound effect -->
+  <audio id="shoot-sound" src="shoot.mp3" preload="auto"></audio>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">Astro Runners | Developed By Richie</div>
+
+  <!-- Menu Screen -->
+  <div id="menu-screen" style="display:none;">
+    <!-- Display astro.png as a 60x60 logo -->
+    <img src="astro.png" alt="Astro Logo">
+    <h1>Astro Runners</h1>
+    <button class="menu-button" id="play-button">Play</button>
+    <button class="menu-button" id="shop-button">Shop</button>
+    <button class="menu-button" id="credits-button">Credits</button>
+    <button class="menu-button" id="exit-button">Exit</button>
+  </div>
+
+  <!-- Shop Modal -->
+  <div id="shop-modal">
+    <div class="modal-content">
+      <span class="close-button" id="close-shop">&times;</span>
+      <h2>Shop</h2>
+      <p id="shop-money">Your Money: $0</p>
+      <div class="shop-item">
+        <p>Weapon Upgrade</p>
+        <button id="weapon-button" data-item="weapon">Buy for $10</button>
+      </div>
+      <div class="shop-item">
+        <p>Nuke</p>
+        <button id="nuke-shop-button" data-item="nuke">Buy for $50</button>
+      </div>
+      <div class="shop-item">
+        <p>Health Upgrade</p>
+        <button id="health-button" data-item="health">Buy for $20</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Canvas -->
+  <canvas id="gameCanvas"></canvas>
+  
+  <!-- Game UI -->
+  <div id="ui">
+    <span id="score">Score: 0</span>
+    <span id="money" style="float:right; margin-right:20px;">Money: $0</span>
+    <span id="health" style="float:right; margin-right:20px;">HP: 100%</span>
+  </div>
+
+  <!-- Shoot Button for Mobile -->
+  <button id="shoot-button">Shoot</button>
+  <!-- Nuke Button for Mobile (shown only if user has a nuke) -->
+  <button id="nuke-button-mobile">Nuke (0)</button>
+
+  <script>
+    /* ----- Global Variables and Setup ----- */
+    
+    // Helper to detect mobile devices.
+    function isMobile() {
+      return /Mobi|Android/i.test(navigator.userAgent);
+    }
+    
+    // Upgrade and pricing tracking.
+    let weaponUpgradeLevel = 0; // 0 = normal, 1 = bigger bullets, 2 = auto-fire, 3 = rainbow bullets.
+    let weaponPrice = 10, nukePrice = 50, healthPrice = 20;
+    let nukeCount = 0;
+    
+    // Get background audio element.
+    const gameAudio = document.getElementById("game-audio");
+    // Try autoplay.
+    gameAudio.play().catch((error) => {
+      console.log("Autoplay prevented:", error);
+    });
+    
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let canvasWidth = window.innerWidth, canvasHeight = window.innerHeight;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    let gameState = "loading"; // "menu", "playing", "gameover"
+    let score = 0, money = 0, health = 100;
+    let gameObjects = [];  // Contains debris and pirate ships.
+    let bullets = [];
+    
+    // Define the player ship – adjust its size for mobile.
+    let ship = { 
+      x: canvasWidth/2, 
+      y: canvasHeight - 80, 
+      width: isMobile() ? 30 : 40, 
+      height: isMobile() ? 30 : 40,
+      speed: 0,
+      accel: 0.3,
+      maxSpeed: 6,
+      dir: 0
+    };
+
+    let lastTime = 0;
+    
+    // Starfield background.
+    const stars = [];
+    for(let i = 0; i < 100; i++){
+      stars.push({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random()*1.5 });
+    }
+
+    // Control flags.
+    let movingLeft = false, movingRight = false;
+    let shooting = false; // For auto-fire mode.
+    let autoFireCooldown = 0;
+    
+    // Utility: Random number between min and max.
+    function random(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+    
+    /* ----- Screen Management ----- */
+    const loadingScreen = document.getElementById('loading-screen');
+    const menuScreen = document.getElementById('menu-screen');
+    const shopModal = document.getElementById('shop-modal');
+    const shootButton = document.getElementById('shoot-button');
+    const ui = document.getElementById('ui');
+    const nukeButtonMobile = document.getElementById('nuke-button-mobile');
+
+    // Show menu after loading screen fade-in.
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+      menuScreen.style.display = 'flex';
+    }, 3000);
+
+    /* ----- Menu Button Handlers ----- */
+    document.getElementById('play-button').addEventListener('click', () => {
+      menuScreen.style.display = 'none';
+      // Start soundtrack on user interaction if autoplay was prevented.
+      gameAudio.play().catch((error) => {
+        console.log("Could not play audio on start:", error);
+      });
+      startGame();
+    });
+    document.getElementById('shop-button').addEventListener('click', () => {
+      shopModal.style.display = 'flex';
+      updateShopMoney();
+      updateShopButtons();
+    });
+    document.getElementById('close-shop').addEventListener('click', () => {
+      shopModal.style.display = 'none';
+    });
+    document.getElementById('credits-button').addEventListener('click', () => {
+      alert("Astro Runners\nDeveloped By Richie");
+    });
+    document.getElementById('exit-button').addEventListener('click', () => {
+      window.close();
+    });
+    
+    /* ----- Shop Purchase Handler ----- */
+    document.getElementById('weapon-button').addEventListener('click', (e) => {
+      if(money >= weaponPrice) {
+        money -= weaponPrice;
+        weaponUpgradeLevel++;
+        weaponPrice += 25;
+        alert("Weapon upgraded to level " + weaponUpgradeLevel + "!");
+        updateUI();
+        updateShopButtons();
+      } else {
+        alert("Not enough money!");
+      }
+    });
+    document.getElementById('nuke-shop-button').addEventListener('click', (e) => {
+      if(money >= nukePrice) {
+        money -= nukePrice;
+        nukeCount++;
+        nukePrice += 25;
+        alert("Nuke purchased! Total nukes: " + nukeCount);
+        updateUI();
+        updateShopButtons();
+      } else {
+        alert("Not enough money!");
+      }
+    });
+    document.getElementById('health-button').addEventListener('click', (e) => {
+      if(money >= healthPrice) {
+        money -= healthPrice;
+        health += 30;
+        healthPrice += 25;
+        alert("Health increased by 30!");
+        updateUI();
+        updateShopButtons();
+      } else {
+        alert("Not enough money!");
+      }
+    });
+    
+    function updateShopButtons() {
+      document.getElementById('weapon-button').textContent = "Buy for $" + weaponPrice;
+      document.getElementById('nuke-shop-button').textContent = "Buy for $" + nukePrice;
+      document.getElementById('health-button').textContent = "Buy for $" + healthPrice;
+    }
+    
+    /* ----- Game Start and Loop ----- */
+    function startGame() {
+      gameState = "playing";
+      canvas.style.display = 'block';
+      ui.style.display = 'block';
+      // Show shoot button only on mobile.
+      shootButton.style.display = isMobile() ? 'block' : 'none';
+      // Reset variables.
+      ship = { 
+        x: canvasWidth/2, 
+        y: canvasHeight - 80, 
+        width: isMobile() ? 30 : 40, 
+        height: isMobile() ? 30 : 40,
+        speed: 0, accel: 0.3, maxSpeed: 6, dir: 0 
+      };
+      score = 0; money = 0; health = 100;
+      gameObjects = []; 
+      bullets = [];
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
+      console.log("Game started, entering game loop...");
+    }
+    
+    function updateUI() {
+      document.getElementById('score').innerText = "Score: " + Math.floor(score);
+      document.getElementById('money').innerText = "Money: $" + money;
+      document.getElementById('health').innerText = "HP: " + health + "%";
+      updateShopMoney();
+      updateMobileNukeButton();
+    }
+    
+    function updateShopMoney() {
+      let shopMoneyElem = document.getElementById('shop-money');
+      if(shopMoneyElem) shopMoneyElem.innerText = "Your Money: $" + money;
+    }
+    
+    function updateMobileNukeButton() {
+      if(isMobile()) {
+        if(nukeCount > 0) {
+          nukeButtonMobile.style.display = 'block';
+          nukeButtonMobile.textContent = "Nuke (" + nukeCount + ")";
+        } else {
+          nukeButtonMobile.style.display = 'none';
+        }
+      }
+    }
+    
+    /* ----- Drawing Functions ----- */
+    function drawStarfield(deltaTime) {
+      for (let star of stars) {
+        star.y += deltaTime * 0.02;
+        if (star.y > canvasHeight) {
+          star.y = 0;
+          star.x = Math.random() * canvasWidth;
+        }
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+    
+    function drawShip(ship) {
+      ctx.save();
+      ctx.translate(ship.x, ship.y);
+      ctx.fillStyle = "#0f0";
+      ctx.beginPath();
+      ctx.moveTo(0, -20);
+      ctx.lineTo(-15, 20);
+      ctx.lineTo(15, 20);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.fillStyle = "rgba(255, 150, 0, 0.7)";
+      ctx.beginPath();
+      ctx.moveTo(-10, 20);
+      ctx.lineTo(0, 30 + Math.random()*5);
+      ctx.lineTo(10, 20);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    function drawPirate(x, y, size) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "#e00";
+      ctx.beginPath();
+      ctx.moveTo(0, -size);
+      ctx.lineTo(-size, size);
+      ctx.lineTo(size, size);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    function drawDebris(x, y, size) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "#aaa";
+      if (Math.random() < 0.5) {
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2, 0, 2*Math.PI);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(-size/2, -size/4);
+        ctx.lineTo(0, -size/2);
+        ctx.lineTo(size/2, -size/4);
+        ctx.lineTo(size/3, size/2);
+        ctx.lineTo(-size/3, size/2);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    
+    /* ----- Spawning Enemies and Debris ----- */
+    function spawnObjects() {
+      let spawnChance = 0.02 + score * 0.00001;
+      if(Math.random() < spawnChance) {
+        let type = Math.random() < 0.7 ? 'debris' : 'pirate';
+        let size, speed;
+        if(type === 'debris'){
+          size = random(20, 35);
+          speed = random(2, 4) + (score * 0.0001);
+        } else {
+          size = random(40, 60);
+          speed = random(1, 2) + (score * 0.00005);
+        }
+        gameObjects.push({
+          type: type,
+          x: random(size, canvasWidth - size),
+          y: -size,
+          size: size,
+          speed: speed
+        });
+      }
+    }
+    
+    /* ----- Game Loop ----- */
+    function gameLoop(time) {
+      let deltaTime = time - lastTime;
+      lastTime = time;
+      
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      
+      drawStarfield(deltaTime);
+      
+      if(movingLeft) { ship.dir = -1; }
+      else if(movingRight) { ship.dir = 1; }
+      else { ship.dir = 0; }
+      
+      if(ship.dir !== 0) {
+        ship.speed += ship.accel;
+        if(ship.speed > ship.maxSpeed) ship.speed = ship.maxSpeed;
+      } else {
+        ship.speed *= 0.95;
+      }
+      ship.x += ship.speed * ship.dir;
+      if(ship.x < 20) ship.x = 20;
+      if(ship.x > canvasWidth - 20) ship.x = canvasWidth - 20;
+      
+      drawShip(ship);
+      
+      spawnObjects();
+      
+      for(let i = gameObjects.length - 1; i >= 0; i--){
+        let obj = gameObjects[i];
+        if(obj.type === 'pirate') {
+          let dx = ship.x - obj.x;
+          let dy = ship.y - obj.y;
+          let angle = Math.atan2(dy, dx);
+          obj.x += Math.cos(angle) * obj.speed;
+          obj.y += Math.sin(angle) * obj.speed;
+        } else {
+          obj.y += obj.speed;
+        }
+        
+        if(obj.type === 'debris') {
+          drawDebris(obj.x, obj.y, obj.size);
+        } else {
+          drawPirate(obj.x, obj.y, obj.size/2);
+        }
+        
+        if(obj.y - obj.size > canvasHeight) {
+          gameObjects.splice(i, 1);
+          score += 1;
+        }
+        
+        let dx = ship.x - obj.x;
+        let dy = ship.y - obj.y;
+        let distance = Math.sqrt(dx*dx + dy*dy);
+        let collisionDist = (obj.size/2) + 20;
+        if(distance < collisionDist) {
+          if(obj.type === 'debris') { health -= 10; }
+          else { health -= 20; }
+          gameObjects.splice(i, 1);
+          updateUI();
+          if(health <= 0) { endGame(); return; }
+        }
+      }
+      
+      for(let i = bullets.length - 1; i >= 0; i--){
+        let bullet = bullets[i];
+        bullet.y -= bullet.speed;
+        ctx.fillStyle = bullet.color || "#ff0";
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+        
+        for(let j = gameObjects.length - 1; j >= 0; j--){
+          let obj = gameObjects[j];
+          let dx = (bullet.x + bullet.width/2) - obj.x;
+          let dy = (bullet.y + bullet.height/2) - obj.y;
+          let dist = Math.sqrt(dx*dx + dy*dy);
+          if(dist < obj.size/2){
+            if(obj.type === 'debris'){
+              money += 1; score += 1;
+            } else {
+              money += 5; score += 5;
+            }
+            gameObjects.splice(j, 1);
+            bullets.splice(i, 1);
+            updateUI();
+            break;
+          }
+        }
+        if(bullet.y + bullet.height < 0) { bullets.splice(i, 1); }
+      }
+      
+      if(weaponUpgradeLevel >= 2 && shooting) {
+        autoFireCooldown -= deltaTime;
+        if(autoFireCooldown <= 0) {
+          fireBullet();
+          autoFireCooldown = 200;
+        }
+      }
+      
+      score += deltaTime * 0.01;
+      updateUI();
+      
+      if(gameState === "playing") {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+    
+    /* ----- End Game ----- */
+    function endGame() {
+      gameState = "gameover";
+      alert("Game Over! Your score: " + Math.floor(score));
+      ui.style.display = 'none';
+      shootButton.style.display = 'none';
+      nukeButtonMobile.style.display = 'none';
+      menuScreen.style.display = 'flex';
+      canvas.style.display = 'none';
+    }
+    
+    /* ----- Controls ----- */
+    document.addEventListener('keydown', (e) => {
+      if(e.key === "ArrowLeft") movingLeft = true;
+      if(e.key === "ArrowRight") movingRight = true;
+      if(e.key === "ArrowUp" || e.key === " ") {
+         if(weaponUpgradeLevel >= 2) { shooting = true; }
+         else { fireBullet(); }
+      }
+      if(e.key === "n") { useNuke(); }
+    });
+    document.addEventListener('keyup', (e) => {
+      if(e.key === "ArrowLeft") movingLeft = false;
+      if(e.key === "ArrowRight") movingRight = false;
+      if(e.key === "ArrowUp" || e.key === " ") { shooting = false; }
+    });
+    
+    document.addEventListener('mousedown', (e) => {
+      if(e.clientX < window.innerWidth / 2) movingLeft = true;
+      else movingRight = true;
+    });
+    document.addEventListener('mouseup', () => {
+      movingLeft = false;
+      movingRight = false;
+    });
+    
+    document.addEventListener('touchstart', (e) => {
+      let touch = e.touches[0];
+      if(touch.clientX < window.innerWidth / 2) movingLeft = true;
+      else movingRight = true;
+    });
+    document.addEventListener('touchend', () => {
+      movingLeft = false;
+      movingRight = false;
+    });
+    
+    shootButton.addEventListener('click', () => {
+      fireBullet();
+    });
+    
+    /* ----- Firing Bullets and Playing Shoot Sound ----- */
+    function fireBullet() {
+      let bulletWidth = 10, bulletHeight = 20, bulletColor = "#ff0";
+      if(weaponUpgradeLevel >= 1) {
+         bulletWidth = 15;
+         bulletHeight = 25;
+      }
+      if(weaponUpgradeLevel >= 3) {
+         bulletColor = "hsl(" + (performance.now() / 10 % 360) + ", 100%, 50%)";
+      }
+      bullets.push({
+         x: ship.x + ship.width/2 - bulletWidth/2,
+         y: ship.y - 10,
+         width: bulletWidth,
+         height: bulletHeight,
+         speed: 8,
+         color: bulletColor
+      });
+      // Clone and play the shoot sound.
+      let laserSound = document.getElementById("shoot-sound").cloneNode();
+      laserSound.volume = 0.3;  // Adjust volume as needed.
+      laserSound.play().catch(error => console.log("Shoot sound error:", error));
+    }
+    
+    function useNuke() {
+      if(nukeCount > 0) {
+         nukeCount--;
+         gameObjects = [];
+         alert("Nuke detonated!");
+         updateUI();
+      }
+    }
+    
+    window.addEventListener('resize', () => {
+      canvasWidth = window.innerWidth;
+      canvasHeight = window.innerHeight;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+    });
+  </script>
+</body>
+</html>
